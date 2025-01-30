@@ -1911,7 +1911,9 @@ Scenario2070_SSP585$Compt.By.Models
 ### 
 ################################################################################
 
-
+#The following data combine terrestrial and marine environment. This following 
+# case shows the combined version for Ecospat analysis. Analysis were also run 
+# and modified accordingly to each terrestrial and marine environment
 
 # Set path
 setwd("C:/SDM_Chionis/Ecospat/Matriz")
