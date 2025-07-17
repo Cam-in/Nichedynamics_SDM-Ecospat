@@ -514,7 +514,7 @@ bio.data$y <- as.numeric(bio.data$y)
 #background points
 bg_points <- dismo::randomPoints(mask = all_raster[[1]],
                                  n = 5000, #Between 5000 & 9000
-                                 p = bio.data[, c("x", "y")],  # Ensure only numeric coordinates are passed fromthe presence points. Random points won't be in the same cells (as defined by mask)
+                                 p = bio.data[, c("x", "y")],  # Ensure only numeric coordinates are passed from the presence points. Random points won't be in the same cells (as defined by mask)
                                  excludep = TRUE) #presence points are excluded from background
 
 
@@ -1326,12 +1326,16 @@ save.image(paste(actual.path, paste(chosen_col_999[T_nr],"_Environment_BIOMOD_re
 ### 15.1 BIOMOD - Formatting data
 ################################################################################
 ### Initialize the datasets for usage in biomod2
+#OCC_combined_ecospat<- cbind(myRespXY, data.frame(myResp))
+#new_myResp <- OCC_combined_ecospat[OCC_combined_ecospat$myResp == 1, ]
+#myResp<-as.numeric(new_myResp$myResp == 1)
+#MyRespXY <- occ1_myresp[, 1:2]
 
-myBiomodData <- biomod2::BIOMOD_FormatingData(resp.var = myResp,
+myBiomodData <- biomod2::BIOMOD_FormatingData(resp.var = new_myResp,
                                               expl.var = myExpl, # explanatory raster data as RasterStack
-                                              resp.xy = myRespXY,
+                                              resp.xy = MyRespXY1,
                                               resp.name = myRespName,
-                                              PA.nb.rep = 1,
+                                             #PA.nb.rep = 1,
                                               #PA.nb.absences = 1000,
                                               #PA.strategy = "random",
                                               filter.raster = TRUE, #point per cell, but this was previously controlled
@@ -1691,11 +1695,10 @@ setwd(paste(actual.path, sep ="/"))
   
 {
     myModelsGLM <- BIOMOD_LoadModels(myBiomodModelOut, algo ='GLM')
-    #myModelsGAM <- BIOMOD_LoadModels(myBiomodModelOut, algo ='GAM')
     myModelsGBM <- BIOMOD_LoadModels(myBiomodModelOut, algo ='GBM')
     myModelsSRE <- BIOMOD_LoadModels(myBiomodModelOut, algo ='SRE')
     myModelsRF <- BIOMOD_LoadModels(myBiomodModelOut,algo ='RF')
-    #myModelsMAXENT <- BIOMOD_LoadModels(myBiomodModelOut, models='MAXENT')
+    myModelsMAXNET <- BIOMOD_LoadModels(myBiomodModelOut, algo = 'MAXNET')
     
     RC_data <- get_formal_data(myBiomodModelOut, 'expl.var')
     RC_variables <- get_formal_data(myBiomodModelOut, 'expl.var.names')
@@ -1721,9 +1724,9 @@ setwd(paste(actual.path, sep ="/"))
     
     save_bm_plot(myModelsGLM, "Response_curve_GLM", myBiomodModelOut, data, variables, species)
     save_bm_plot(myModelsGBM, "Response_curve_GBM", myBiomodModelOut, data, variables, species)
-    #save_bm_plot(myModelsGAM, "Response_curve_GAM", myBiomodModelOut, data, variables, species)
     save_bm_plot(myModelsSRE, "Response_curve_SRE", myBiomodModelOut, data, variables, species)
     save_bm_plot(myModelsRF, "Response_curve_RF", myBiomodModelOut, data, variables, species)
+    save_bm_plot(myModelsMAXNET, "Response_curve_MAXNET", myBiomodModelOut, data, variables, species)
 
     png("Response_curve_All.png", width = 800, height = 800, units = "px", res = 100)
     responsecurve_all <- biomod2::bm_PlotResponseCurves(
@@ -1910,102 +1913,184 @@ Scenario2070_SSP585$Compt.By.Models
 ###  ECOSPAT SECTION
 ### 
 ################################################################################
-
+  
 #The following data combine terrestrial and marine environment. This following 
-# case shows the combined version for Ecospat analysis. Analysis were also run 
-# and modified accordingly to each terrestrial and marine environment
+# workflow shows the combined version for Ecospat analysis. Analysis were also run 
+# and modified accordingly to each terrestrial and marine environment.
+# For terrestrial environment consider column selection from 3:6, for 
+# marine environment from 3:6
+# Also, for marine and terrestrial "[, 7] == 1"
+##load packages
+library(raster)
+library(ecospat)
+library(dplyr)
+library(tidyverse)
+library(ade4)
 
 # Set path
-setwd("C:/SDM_Chionis/Ecospat/Matriz")
+###Read input data
+sp1 <- read.delim("C:/SDM_Chionis/Ecospat/DATA_CHIONIS/OCC_C_albus_terrestre.txt") #change this for marine data
+sp2 <- read.delim("C:/SDM_Chionis/Ecospat/DATA_CHIONIS/OCC_C_minor_terrestre.txt")
 
-# Reading data of invasive species (C_min) and native species (C_alb)
-C_min <- read.csv("Chionis_minor_matriz_integrado.csv")
-C_alb <- read.csv("Chionis_albus_matriz_integrado.csv")
+sp1 <- sp1[,1:3]
+sp2 <- sp2[,1:3]
 
-# Principal Components Analysis (PCA) for climatic variables
-pca.env <- dudi.pca(rbind(C_alb, C_min)[, 3:9], scannf = FALSE, nf = 2)
-ecospat.plot.contrib(contrib = pca.env$co, eigen = pca.env$eig)
+data <- rbind(sp1, sp2)
 
-# PCA scores for the entire study area
+names(data)[names(data) == "name"] <- "species"
+names(data)[names(data) == "x"] <- "lon"
+names(data)[names(data) == "y"] <- "lat"
+data$spp <- data$species
+
+data$species[data$species == "C.albus"] <- "sp1"
+data$species[data$species == "C.minor"] <- "sp2" 
+
+
+# Dataframe for Specie1
+df1 <- data %>%
+  filter(species == "sp1") %>%
+  select(lon, lat)
+
+# Dataframe for Specie2
+df2 <- data %>%
+  filter(species == "sp2") %>%
+  select(lon, lat)
+
+
+folder_path1 <- "C:/SDM_Chionis/Ecospat/DATA_CHIONIS/BIOS/C_albus/terrestre/PRES"
+folder_path2 <- "C:/SDM_Chionis/Ecospat/DATA_CHIONIS/BIOS/C_minor/terrestre/PRES"
+
+
+##Load raster data
+environ1 = stack(list.files(path = folder_path1, pattern='.tif', full.names=TRUE))
+environ2 = stack(list.files(path = folder_path2, pattern='.tif', full.names=TRUE))
+
+#Crop by extent
+studyArea1 = extent(-74,-33,-67,-26)
+predictors1 <- crop(environ1, studyArea1)
+
+#Crop by extent
+studyArea2 = extent(33,76,-57,-43)
+predictors2 <- crop(environ2, studyArea2)
+
+#plot area
+sp1Data = df1
+sp2Data = df2
+
+##background points
+sp1BG = data.frame(dismo::randomPoints(predictors1[[1]], 1000)); names(sp1BG) = c('lon','lat')
+sp2BG = data.frame(dismo::randomPoints(predictors2[[1]], 1000)); names(sp2BG) = c('lon','lat')
+
+##data.frames
+sp1DF = data.frame(rbind(sp1Data,sp1BG), pres=c(rep(1,nrow(sp1Data)), rep(0,nrow(sp1BG)) ))
+sp2DF = data.frame(rbind(sp2Data,sp2BG), pres=c(rep(1,nrow(sp2Data)), rep(0,nrow(sp2BG)) ))
+
+##data.frame with ambiental variables
+sp1DFenv = raster::extract(predictors1, sp1DF[,c('lon','lat')], na.rm=TRUE); sp1DF = data.frame(sp1DF, sp1DFenv)
+sp2DFenv = raster::extract(predictors2, sp2DF[,c('lon','lat')], na.rm=TRUE); sp2DF = data.frame(sp2DF, sp2DFenv)
+
+##NA cleaning
+sp1DF = sp1DF[complete.cases(sp1DF),]
+sp2DF = sp2DF[complete.cases(sp2DF),]
+
+## Niche and PCA analize
+
+##The PCA is calibrated on all the sites of the study area
+pca.env <- dudi.pca(rbind(sp1DF,sp2DF)[,c(4:ncol(sp1DF))],scannf=F,nf=2)
+
+##PCA scores for the whole study area
 scores.globclim <- pca.env$li
 
-# PCA scores for the native distribution of the species
-scores.sp.C_alb <- suprow(pca.env, C_alb[which(C_alb[, 10] == 1), 3:9])$li
+##PCA scores for the species native distribution
+scores.sp.sp1 <- suprow(pca.env,sp1DF[which(sp1DF[,'pres']==1),c(4:ncol(sp1DF))])$li
 
-# PCA scores for the invasive distribution of the species
-scores.sp.C_min <- suprow(pca.env, C_min[which(C_min[, 10] == 1), 3:9])$li
+##PCA scores for the species invasive distribution
+scores.sp.sp2 <- suprow(pca.env,sp2DF[which(sp2DF[,'pres']==1),c(4:ncol(sp2DF))])$li
 
-# PCA scores for the entire native study area
-scores.clim.C_alb <- suprow(pca.env, C_alb[, 3:9])$li
+##PCA scores for the whole native study area
+scores.clim.sp1 <-suprow(pca.env,sp1DF[,c(4:ncol(sp1DF))])$li
 
-# PCA scores for the entire invaded study area
-scores.clim.C_min <- suprow(pca.env, C_min[, 3:9])$li
+##PCA scores for the whole invaded study area
+scores.clim.sp2 <- suprow(pca.env,sp2DF[,c(4:ncol(sp2DF))])$li
 
-# Calculate the Occurrence Density Grid with ecospat.grid.clim.dyn()
-# For the species in its native range (North America)
-grid.clim.C_alb <- ecospat.grid.clim.dyn(glob = scores.globclim, glob1 = scores.clim.C_alb, sp = scores.sp.C_alb, R = 200, th.sp = 0)
+##gridding the native niche
+grid.clim.sp1 <-ecospat.grid.clim.dyn(glob=scores.globclim, glob1=scores.clim.sp1, sp=scores.sp.sp1, R=100, th.sp=0)
 
-# For the species in its invaded range (South America - Chile)
-grid.clim.C_min <- ecospat.grid.clim.dyn(glob = scores.globclim, glob1 = scores.clim.C_min, sp = scores.sp.C_min, R = 200, th.sp = 0)
+##gridding the invasive niche
+grid.clim.sp2 <- ecospat.grid.clim.dyn(glob=scores.globclim, glob1=scores.clim.sp2, sp=scores.sp.sp2, R=100, th.sp=0)
 
-# Calculate the Niche Overlap with ecospat.niche.overlap()
-D.overlap <- ecospat.niche.overlap(grid.clim.C_alb, grid.clim.C_min, cor = TRUE)$D
-D.overlap  # Niche overlap between the native and invaded ranges = 35%.
+##Niche equivalency
+##OBS: Niche equivalency test H1: Is the overlap between the native and invaded niche higher than two random niches
+D.overlap <- ecospat.niche.overlap (grid.clim.sp1, grid.clim.sp2, cor=T)$D 
+eq.test.equi <- ecospat.niche.equivalency.test(grid.clim.sp1, grid.clim.sp2, rep=100)
+eq.test.simi <- ecospat.niche.similarity.test(grid.clim.sp2, grid.clim.sp1, rep=100) #aleatoriza so uma das sp
 
-# Perform the Niche Equivalency Test with ecospat.niche.equivalency.test() according to Warren et al. (2008)
-eq.test <- ecospat.niche.equivalency.test(grid.clim.C_alb, grid.clim.C_min, rep = 100)
-# Niche Equivalency Test H1: Is the overlap between the native and invaded niches greater than the overlap between two random niches?
+Dobs_equi= eq.test.equi$obs$D #Observed D index
+Iobs_equi = eq.test.equi$obs$I #Observed I index
+DpValue_equi = eq.test.equi$p.D #p-value Index D
+IpValue_equi = eq.test.equi$p.I #p-value Index I
+Dobs_simi= eq.test.simi$obs$D #Observed D index
+Iobs_simi = eq.test.simi$obs$I #Observed I index
+DpValue_simi = eq.test.simi$p.D #p-value Index D
+IpValue_simi = eq.test.simi$p.I #p-value Index I
+D.overlap = D.overlap
 
-# Perform the Niche Similarity Test with ecospat.niche.similarity.test()
-sim.test <- ecospat.niche.similarity.test(grid.clim.C_alb, grid.clim.C_min, rep = 100, rand.type = 2)
-# Niche Similarity Test H1: Is the overlap between the native and invaded niches greater than when the invaded niche is randomly placed in the invaded area?
-
-# Plot the Niche Equivalency/Similarity Tests
-ecospat.plot.overlap.test(eq.test, "D", "Equivalency")
-ecospat.plot.overlap.test(sim.test, "I", "Similarity")
-
-# Delimit niche categories and quantify niche dynamics in analogous climates with ecospat.niche.dyn.index()
-niche.dyn <- ecospat.niche.dyn.index(grid.clim.C_alb, grid.clim.C_min, intersection = 0)
-
-#### Change colors by ecology
-ecospat.plot.niche.dyn(
-  grid.clim.C_min, 
-  grid.clim.C_alb, 
-  interest = 2, 
-  title = "",
-  name.axis1 = "PC1", 
-  name.axis2 = "PC2",
-  xlim = c(-20, 20),  # Manually adjust the X-axis range
-  ylim = c(-20, 20)   # Manually adjust the Y-axis range
+#### save output as data frame
+output <- data.frame(
+  sp1 = character(),
+  sp2 = character(),
+  D.equi = numeric(),
+  p_value.equi = numeric(),
+  I.equi = numeric(),
+  p_valor.equi = numeric(),
+  D.simi = numeric(),
+  p_value.simi = numeric(),
+  I.simi = numeric(),
+  p_valor.simi = numeric(),
+  D.overlap = numeric(),
+  stringsAsFactors = FALSE
 )
 
-#
-summary(grid.clim.C_alb$z.uncor)
-summary(grid.clim.C_min$z.uncor)
+sp1_name <- "C.albus"
+sp2_name <- "C.minor"
+
+#export results as a table 
+output <- rbind(output, data.frame(
+  sp1 = sp1_name,
+  sp2 = sp2_name,
+  D.equi = Dobs_equi,
+  p_value.equi = DpValue_equi,
+  I.equi = Iobs_equi,
+  p_valor.equi = IpValue_equi,
+  D.simi = Dobs_simi,
+  p_value.simi = DpValue_simi,
+  I.simi = Iobs_simi,
+  p_valor.simi = IpValue_simi,
+  D.overlap = D.overlap
+))
+
+##save as .csv
+write.csv(output, "C:/SDM_Chionis/Ecospat/results/terr7_overlap.csv", row.names=FALSE)
+
+ecospat.plot.overlap.test(eq.test.equi, "D", "Equivalency")
+ecospat.plot.overlap.test(eq.test.simi, "D", "Similarity")
+
+ecospat.plot.niche.dyn(grid.clim.sp1, grid.clim.sp2, intersection = 0, title = "", name.axis1 =
+                         "Axis 1", name.axis2 = "Axis 2", interest = 1, col.abn
+                       = "lightgreen", col.unf = "green", col.exp = "red",
+                       col.stab = "blue", col.pio = "pink", col.NA = "grey",
+                       colZ1 = "green3", colZ2 = "red3", transparency = 70)
 
 
-# Add title with position control
-#title(main = "Total Niche Overlap", line = 3)  # Adjust the `line` value for more separation
 
-# Niche centroid shift
-#ecospat.shift.centroids(scores.sp.C_alb, scores.sp.C_min, scores.clim.C_alb, scores.clim.C_min)
+# ecospat.plot.niche.dyn(grid.clim.sp1, grid.clim.sp2, quant = 0.1, interest = 2,
+#                        title = "Niche Dynamics", name.axis1 = "PC1", name.axis2 = "PC2")
 
-# Calculate niche dynamics indices with different intersection values
-# Note: Do not use NA as the value for intersection
-index_na <- ecospat.niche.dyn.index(grid.clim.C_alb, grid.clim.C_min, intersection = 0.1)
-index_0 <- ecospat.niche.dyn.index(grid.clim.C_alb, grid.clim.C_min, intersection = 0)
-index_0_05 <- ecospat.niche.dyn.index(grid.clim.C_alb, grid.clim.C_min, intersection = 0.05)
-index_na
-index_0
-index_0_05
-
-# Plot niche dynamics along a gradient (mean annual precipitation) with ecospat.plot.niche.dyn()
-# Native niche grid
-grid.clim.t.C_alb <- ecospat.grid.clim.dyn(glob = as.data.frame(rbind(C_alb, C_min)[, 10]), glob1 = as.data.frame(C_alb[, 3]), sp = as.data.frame(C_alb[which(C_alb[, 10] == 1), 3]), R = 1000, th.sp = 0)
-
-# C_minadido niche grid
-grid.clim.t.C_min <- ecospat.grid.clim.dyn(glob = as.data.frame(rbind(C_alb, C_min)[, 10]), glob1 = as.data.frame(C_min[, 3]), sp = as.data.frame(C_min[which(C_min[, 10] == 1), 3]), R = 1000, th.sp = 0)
-
-t.dyn <- ecospat.niche.dyn.index(grid.clim.t.C_alb, grid.clim.t.C_min, intersection = 0.1)
-
-ecospat.plot.niche.dyn(grid.clim.t.C_alb, grid.clim.t.C_min, quant = 0, interest = 2, title = "Niche Overlap", name.axis1 = "Mean annual precipitation")
+legend("bottom", 
+       legend = c("Unfilling (C.albus)", "Stability", "Expansion (C.minor)"),
+       fill = c("green", "blue", "red"),
+       bty = "n",
+       inset = c(0, -0.2),   # move down
+       xpd = TRUE,            # allow legend outside the graphical range
+       horiz = TRUE,          # optional: horizontal legend
+       cex = 0.6)             # text size
