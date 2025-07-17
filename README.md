@@ -5,6 +5,7 @@ _Please citate both Zenodo repository & publication when using_
 
 ## Authors
 Dra. Camila Neder (main programmer & reseracher) & Catalina Escobar (data curator & researcher)
+Dr. Pablo Guerrero (Supervisor)
 
 ## Version
 R-4.1.2    biomod 4.2
