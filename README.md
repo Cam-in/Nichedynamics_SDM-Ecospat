@@ -6,8 +6,7 @@ _Please citate both Zenodo repository & publication when using_
 https://zenodo.org/records/15866406
 
 ## Authors
-Dra. Camila Neder (main programmer & reseracher) & Catalina Escobar (data curator & researcher)
-Dr. Pablo Guerrero (Researcher)
+Dra. Camila Neder (main programmer & researcher), Catalina Escobar (data curator & researcher) & Dr. Pablo Guerrero (Researcher)
 
 ## Version
 R-4.1.2    biomod 4.2
