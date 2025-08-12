@@ -1,15 +1,14 @@
 ################################################################################
 ###
 ###    SDM_version2024
-###    Authors script: Dra. Camila Neder & Catalina Escobar
-###    Supervision: Dr. Pablo Guerrero
+###    Authors script: Dra. Camila Neder, Biol. Catalina Escobar & Dr. Pablo Guerrero
 ###    Citation: 1. Neder C (2023) El bentos antártico y su respuesta al cambio climático: una aproximaci?n usando modelos de distribuci?n de especies como caso de estudio en caleta Potter. Universidad Nacional de C?rdoba https://rdu.unc.edu.ar/handle/11086/551476
 ###              2. Neder et al. (2024) Antarctic benthic species distribution models and compositional analysis in a coastal ecosystem under glacier retreat DOI: https://doi.org/10.3354/meps14731
 ###              3. Escobar et al. (in press) Climate-driven range shifts across sub-Antarctic and Antarctic terrestrial and marine niches in sheathbills (Chionis)
 ###
-###          last changes: 2024-December-01
+###          last changes: 2025-June-30 
 ###  
-###                   R-4.1.2    biomod 4.2
+###                   R-4.1.2    biomod 4.2   ecospat 4.1.1f
 ###
 ################################################################################
 
@@ -1698,7 +1697,7 @@ setwd(paste(actual.path, sep ="/"))
     myModelsGBM <- BIOMOD_LoadModels(myBiomodModelOut, algo ='GBM')
     myModelsSRE <- BIOMOD_LoadModels(myBiomodModelOut, algo ='SRE')
     myModelsRF <- BIOMOD_LoadModels(myBiomodModelOut,algo ='RF')
-    myModelsMAXNET <- BIOMOD_LoadModels(myBiomodModelOut, algo = 'MAXNET')
+    myModelsMAXNET <- BIOMOD_LoadModels(myBiomodModelOut, models='MAXNET')
     
     RC_data <- get_formal_data(myBiomodModelOut, 'expl.var')
     RC_variables <- get_formal_data(myBiomodModelOut, 'expl.var.names')
@@ -1914,10 +1913,10 @@ Scenario2070_SSP585$Compt.By.Models
 ### 
 ################################################################################
   
-#The following data combine terrestrial and marine environment. This following 
-# workflow shows the combined version for Ecospat analysis. Analysis were also run 
+#The following data combines terrestrial and marine environments. This following 
+# workflow shows the combined version for Ecospat analysis. Analyses were also run 
 # and modified accordingly to each terrestrial and marine environment.
-# For terrestrial environment consider column selection from 3:6, for 
+# For the terrestrial environment, consider column selection from 3:6, for 
 # marine environment from 3:6
 # Also, for marine and terrestrial "[, 7] == 1"
 ##load packages
@@ -1929,7 +1928,7 @@ library(ade4)
 
 # Set path
 ###Read input data
-sp1 <- read.delim("C:/SDM_Chionis/Ecospat/DATA_CHIONIS/OCC_C_albus_terrestre.txt") #change this for marine data
+sp1 <- read.delim("C:/SDM_Chionis/Ecospat/DATA_CHIONIS/OCC_C_albus_terrestre.txt")
 sp2 <- read.delim("C:/SDM_Chionis/Ecospat/DATA_CHIONIS/OCC_C_minor_terrestre.txt")
 
 sp1 <- sp1[,1:3]
@@ -1942,9 +1941,8 @@ names(data)[names(data) == "x"] <- "lon"
 names(data)[names(data) == "y"] <- "lat"
 data$spp <- data$species
 
-data$species[data$species == "C.albus"] <- "sp1"
+data$species[data$species == "C.albus"] <- "sp1" 
 data$species[data$species == "C.minor"] <- "sp2" 
-
 
 # Dataframe for Specie1
 df1 <- data %>%
@@ -1956,10 +1954,8 @@ df2 <- data %>%
   filter(species == "sp2") %>%
   select(lon, lat)
 
-
 folder_path1 <- "C:/SDM_Chionis/Ecospat/DATA_CHIONIS/BIOS/C_albus/terrestre/PRES"
 folder_path2 <- "C:/SDM_Chionis/Ecospat/DATA_CHIONIS/BIOS/C_minor/terrestre/PRES"
-
 
 ##Load raster data
 environ1 = stack(list.files(path = folder_path1, pattern='.tif', full.names=TRUE))
@@ -1993,7 +1989,7 @@ sp2DFenv = raster::extract(predictors2, sp2DF[,c('lon','lat')], na.rm=TRUE); sp2
 sp1DF = sp1DF[complete.cases(sp1DF),]
 sp2DF = sp2DF[complete.cases(sp2DF),]
 
-## Niche and PCA analize
+## Niche and PCA analysis
 
 ##The PCA is calibrated on all the sites of the study area
 pca.env <- dudi.pca(rbind(sp1DF,sp2DF)[,c(4:ncol(sp1DF))],scannf=F,nf=2)
@@ -2019,20 +2015,20 @@ grid.clim.sp1 <-ecospat.grid.clim.dyn(glob=scores.globclim, glob1=scores.clim.sp
 ##gridding the invasive niche
 grid.clim.sp2 <- ecospat.grid.clim.dyn(glob=scores.globclim, glob1=scores.clim.sp2, sp=scores.sp.sp2, R=100, th.sp=0)
 
-##Niche equivalency
+##equivalencia de nicho
 ##OBS: Niche equivalency test H1: Is the overlap between the native and invaded niche higher than two random niches
 D.overlap <- ecospat.niche.overlap (grid.clim.sp1, grid.clim.sp2, cor=T)$D 
 eq.test.equi <- ecospat.niche.equivalency.test(grid.clim.sp1, grid.clim.sp2, rep=100)
-eq.test.simi <- ecospat.niche.similarity.test(grid.clim.sp2, grid.clim.sp1, rep=100) #aleatoriza so uma das sp
-
+eq.test.simi <- ecospat.niche.similarity.test(grid.clim.sp2, grid.clim.sp1, rep=100) #randomize sp
+                          
 Dobs_equi= eq.test.equi$obs$D #Observed D index
 Iobs_equi = eq.test.equi$obs$I #Observed I index
-DpValue_equi = eq.test.equi$p.D #p-value Index D
-IpValue_equi = eq.test.equi$p.I #p-value Index I
+DpValue_equi = eq.test.equi$p.D #p-value index D
+IpValue_equi = eq.test.equi$p.I #p-value index I
 Dobs_simi= eq.test.simi$obs$D #Observed D index
 Iobs_simi = eq.test.simi$obs$I #Observed I index
-DpValue_simi = eq.test.simi$p.D #p-value Index D
-IpValue_simi = eq.test.simi$p.I #p-value Index I
+DpValue_simi = eq.test.simi$p.D #p-value index D
+IpValue_simi = eq.test.simi$p.I #p-value index I
 D.overlap = D.overlap
 
 #### save output as data frame
@@ -2081,8 +2077,6 @@ ecospat.plot.niche.dyn(grid.clim.sp1, grid.clim.sp2, intersection = 0, title = "
                        col.stab = "blue", col.pio = "pink", col.NA = "grey",
                        colZ1 = "green3", colZ2 = "red3", transparency = 70)
 
-
-
 # ecospat.plot.niche.dyn(grid.clim.sp1, grid.clim.sp2, quant = 0.1, interest = 2,
 #                        title = "Niche Dynamics", name.axis1 = "PC1", name.axis2 = "PC2")
 
@@ -2090,7 +2084,7 @@ legend("bottom",
        legend = c("Unfilling (C.albus)", "Stability", "Expansion (C.minor)"),
        fill = c("green", "blue", "red"),
        bty = "n",
-       inset = c(0, -0.2),   # move down
-       xpd = TRUE,            # allow legend outside the graphical range
+       inset = c(0, -0.2),   # shifts down
+       xpd = TRUE,            # draw legend outside the area 
        horiz = TRUE,          # optional: horizontal legend
        cex = 0.6)             # text size
